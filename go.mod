@@ -1,4 +1,4 @@
-module github.com/lucasm0ta/trex-eyes
+module github.com/lucasm0ta/change-detector
 
 go 1.16
 
