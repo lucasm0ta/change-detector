@@ -4,8 +4,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/lucasm0ta/trex-eyes/core"
-	"github.com/lucasm0ta/trex-eyes/ports"
+	"github.com/lucasm0ta/change-detector/core"
+	"github.com/lucasm0ta/change-detector/ports"
 )
 
 func main() {
