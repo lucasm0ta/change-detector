@@ -3,9 +3,11 @@ package ports
 import (
 	"fmt"
 	"log"
+	"strconv"
+	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/lucasm0ta/trex-eyes/core"
+	"github.com/lucasm0ta/change-detector/core"
 )
 
 //
@@ -46,48 +48,65 @@ func (telegram *TelegramBot) Start() {
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
 
-	updates := bot.GetUpdatesChan(u)
+	// Set up the callback for page changes
+	telegram.watcherService.OnChangeCallback = func(reponse *core.WatchResponse) {
+		chatID, _ := strconv.ParseInt(reponse.ChannelID, 10, 64)
+		msg := tgbotapi.NewMessage(chatID, fmt.Sprintf("🔔 Change detected!\n%s\n\n\n%s", reponse.URL.String(), reponse.Diff))
+		if _, err := bot.Send(msg); err != nil {
+			log.Printf("Error sending notification: %v", err)
+		}
+	}
 
+	updates := bot.GetUpdatesChan(u)
 	for update := range updates {
 		if update.Message == nil {
 			continue
 		}
-
 		msg := tgbotapi.NewMessage(update.Message.Chat.ID, "")
 		if update.Message.IsCommand() {
 			switch update.Message.Command() {
 			case "watch":
 				url := update.Message.CommandArguments()
-				watchRequest, err := buildWatchRequest(url, fmt.Sprint(update.Message.Chat.ID))
-				if err != nil {
-					msg.Text = "oooops could not watch this"
-					log.Panic(err)
+				msg.Text = telegram.Watch(url, fmt.Sprint(update.Message.Chat.ID))
+			case "list":
+				var result strings.Builder
+				for i, watched := range telegram.watcherService.GetWatched() {
+					result.WriteString(fmt.Sprintf("%d. %s\n", i+1, watched.Request.URL.String()))
 				}
-				err = telegram.watcherService.Register(watchRequest)
-				if err == nil {
-					msg.Text = "now watching"
-				} else {
-					msg.Text = "oooops could not watch this"
-					log.Panic(err)
-
-				}
-			case "list ":
-				msg.Text = "list"
+				msg.Text = result.String()
 			case "remove":
 				msg.Text = "removed"
 			case "help":
 				msg.Text = "can't help U, sorry :/"
 			default:
-				msg.Text = ""
+				msg.Text = "Sorry, your command "
 			}
 		} else {
 			msg.Text = `
-			Sorry, I Con only understand the following commands:
+			Sorry, I Can only understand the following commands:
 			/watch
 			/list
 			/remove
 			`
 		}
 		bot.Send(msg)
+	}
+}
+
+func (telegram *TelegramBot) Watch(url string, chatID string) string {
+	if url == "" {
+		return "pass a URL please"
+	}
+	watchRequest, err := buildWatchRequest(url, chatID)
+	if err != nil {
+		log.Printf("Error building watch request: %v", err)
+		return "oooops could not watch this"
+	}
+	err = telegram.watcherService.Register(watchRequest)
+	if err == nil {
+		return "now watching"
+	} else {
+		log.Printf("Error watching request: %v", err)
+		return "oooops could not watch this"
 	}
 }

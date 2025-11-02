@@ -16,13 +16,24 @@ type WatchRequest struct {
 	Interval int64
 }
 
+type WatchResponse struct {
+
+	// URL to be checked if changed
+	URL *url.URL `json:"url"`
+
+	// External identification of the feedback channel. Like chatId, user email, etc.
+	ChannelID string `json:"channel"`
+
+	Diff string `json:"diff"`
+}
+
 type ChannelInfo struct {
 	// Local identification of the client
 	ID string `json:"id"`
 
-	// Cna be wither telegram, email, sms, or smoke_signal
+	// Can be wither telegram, email, sms, or smoke_signal
 	ChannelType string `json:"type"`
 
-	// External identification of the feedback channel
+	// External identification of the feedback channel. Like chatId, user email, etc.
 	ChannelID string `json:"channel"`
 }

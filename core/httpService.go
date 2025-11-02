@@ -2,7 +2,9 @@ package core
 
 import (
 	"bytes"
+	"crypto/md5"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 
@@ -19,46 +21,48 @@ func NewHttpService() *HttpService {
 	return httpService
 }
 
-func RenderNode(n *html.Node) string {
-	var buf bytes.Buffer
-	w := io.Writer(&buf)
-	html.Render(w, n)
-	return buf.String()
-}
-
 func Body(doc *html.Node) (*html.Node, error) {
-	var body *html.Node
-	var crawler func(*html.Node)
-	crawler = func(node *html.Node) {
+	var crawler func(*html.Node) *html.Node
+	crawler = func(node *html.Node) *html.Node {
 		if node.Type == html.ElementNode && node.Data == "body" {
-			body = node
-			return
+			return node
 		}
 		for child := node.FirstChild; child != nil; child = child.NextSibling {
-			crawler(child)
+			if result := crawler(child); result != nil {
+				return result
+			}
 		}
+		return nil
 	}
-	crawler(doc)
-	if body != nil {
+
+	if body := crawler(doc); body != nil {
 		return body, nil
 	}
 	return nil, errors.New("Missing <body> in the node tree")
 }
 
-func (httpService HttpService) GetBody(URL string) (string, error) {
+func (httpService HttpService) GetBody(URL string) (*html.Node, error) {
 	resp, err := http.Get(URL)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer resp.Body.Close()
 	htmlTree, err := html.Parse(resp.Body)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	bodyNode, err := Body(htmlTree)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	bodyString := RenderNode(bodyNode)
-	return bodyString, nil
+	return bodyNode, nil
+}
+
+func (httpService HttpService) GetNodeHash(node *html.Node) string {
+	var buf bytes.Buffer
+	w := io.Writer(&buf)
+	html.Render(w, node)
+	hash := md5.New()
+	io.WriteString(hash, buf.String())
+	return fmt.Sprintf("%x", hash.Sum(nil))
 }
